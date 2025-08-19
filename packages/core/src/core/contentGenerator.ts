@@ -114,6 +114,29 @@ export async function createContentGenerator(
     'User-Agent': userAgent,
   };
 
+  // 🚀 NEW: Check for custom model providers first
+  try {
+    const { detectProvider } = await import('../providers/factory.js');
+    const modelName = gcConfig?.getModel() || config.model;
+    console.log('🔍 createContentGenerator - Model detection:', {
+      modelFromGcConfig: gcConfig?.getModel(),
+      modelFromConfig: config.model,
+      effectiveModel: modelName,
+      authType: config.authType,
+      anthropicToken: !!process.env['ANTHROPIC_AUTH_TOKEN'],
+      anthropicUrl: !!process.env['ANTHROPIC_BASE_URL'],
+    });
+    const customProvider = detectProvider(modelName);
+    if (customProvider) {
+      console.log('✅ Using custom provider for model:', modelName);
+      return new LoggingContentGenerator(customProvider, gcConfig);
+    }
+    console.log('ℹ️ No custom provider detected, using default Gemini path');
+  } catch (error) {
+    // Silently fall back to standard providers if custom providers fail
+    console.error('❌ Custom provider detection failed:', error);
+  }
+
   if (
     config.authType === AuthType.LOGIN_WITH_GOOGLE ||
     config.authType === AuthType.CLOUD_SHELL
